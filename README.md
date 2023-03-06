@@ -1,14 +1,39 @@
-# Project
+# Fallible allocation functios for Vec
 
-> This repo has been populated by an initial template to help get you started. Please
-> make sure to update the content to build a great experience for community-building.
+Fallible allocation functions for the Rust standard library's [`alloc::vec::Vec`](https://doc.rust-lang.org/std/vec/struct.Vec.html) type.
 
-As the maintainer of this project, please make a few updates:
+These functions are designed to be usable with `#![no_std]` and `#[cfg(no_global_oom_handling)]`(see <https://github.com/rust-lang/rust/pull/84266>) enabled.
 
-- Improving this README.MD file to provide a great experience
-- Updating SUPPORT.MD with content about this project's support experience
-- Understanding the security reporting process in SECURITY.MD
-- Remove this section from the README
+## Usage
+
+The recommended way to add these functions to `Vec` is by adding a `use` declaration for the entire module: `use fallible_vec::*`:
+```rust
+use fallible_vec::*;
+let mut vec = try_vec![1, 2]?;
+vec.try_push(3)?;
+assert_eq!(vec, [1, 2, 3]);
+```
+
+## Panic Safety
+
+These methods are "panic safe", meaning that if a call to external code (e.g., an iterator's `next()` method or an implementation of `Clone::clone()`) panics, then these methods will leave the `Vec` in a consistent state:
+* `len()` will be less than or equal to `capacity()`.
+* Items in `0..len()` will only be items originally in the `Vec` or items being added to the `Vec`. It will never include uninitialized memory, duplicated items or dropped items.
+* Items originally (but no longer) in the `Vec` or being added to (but not yet in) the `Vec` may be leaked - any method that may leak items like this will have a note to specify its behavior.
+
+The exact behavior of each method is specified in its documentations.
+
+## Code origin
+
+Most of this code is forked form [Rust's Standard Library](https://github.com/rust-lang/rust). While we will attempt to keep the code and docs in sync, if you notice any issues please check if they have been fixed in the Standard Library first.
+
+## This API is incomplete
+
+There are many more infallible functions on `Vec` which have not been ported yet. If there's a particular API that you're missing feel free to open a PR or file an Issue to get it added.
+
+## Why are these not already in the Standard Library
+
+There is a [PR to add these and more](https://github.com/rust-lang/rust/pull/95051) to the Standard Library, followed by an [RFC to discuss if it's a good idea or not to do so](https://github.com/rust-lang/rfcs/pull/3271).
 
 ## Contributing
 
