@@ -1,4 +1,4 @@
-# Fallible allocation functios for Vec
+# Fallible allocation functions for Vec
 
 Fallible allocation functions for the Rust standard library's [`alloc::vec::Vec`](https://doc.rust-lang.org/std/vec/struct.Vec.html) type.
 
