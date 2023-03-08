@@ -1,0 +1,64 @@
+name: Build and test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+# This allows a subsequently queued workflow run to interrupt previous runs
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    env:
+      RUSTC_BOOTSTRAP: 1
+      CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Run tests
+        run: cargo test --locked
+
+      - name: Clippy
+        run: cargo clippy --locked -- -D warnings
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Check docs
+        run: cargo doc --locked
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+      - name: Add the rust-src component
+        run: rustup component add rust-src --toolchain stable-${{ matrix.target }}
+
+      - name: Build with no_global_oom_handling
+        run: cargo build --locked -Z build-std=core,alloc --target ${{ matrix.target }} -Z sparse-registry
+        env:
+          RUSTFLAGS: --cfg no_global_oom_handling
+
+      - name: Install miri
+        run: rustup toolchain install nightly --component miri
+
+      - name: Setup miri
+        run: cargo +nightly miri setup
+
+      - name: Run tests under miri
+        run: cargo +nightly miri test
