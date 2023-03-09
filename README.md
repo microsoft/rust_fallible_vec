@@ -21,11 +21,11 @@ These methods are "panic safe", meaning that if a call to external code (e.g., a
 * Items in `0..len()` will only be items originally in the `Vec` or items being added to the `Vec`. It will never include uninitialized memory, duplicated items or dropped items.
 * Items originally (but no longer) in the `Vec` or being added to (but not yet in) the `Vec` may be leaked - any method that may leak items like this will have a note to specify its behavior.
 
-The exact behavior of each method is specified in its documentations.
+The exact behavior of each method is specified in its documentation.
 
 ## Code origin
 
-Most of this code is forked form [Rust's Standard Library](https://github.com/rust-lang/rust). While we will attempt to keep the code and docs in sync, if you notice any issues please check if they have been fixed in the Standard Library first.
+Most of this code is forked from [Rust's Standard Library](https://github.com/rust-lang/rust). While we will attempt to keep the code and docs in sync, if you notice any issues please check if they have been fixed in the Standard Library first.
 
 ## This API is incomplete
 
