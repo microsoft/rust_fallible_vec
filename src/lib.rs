@@ -1,18 +1,19 @@
 //! Fallible allocation functions for the Rust standard library's [`alloc::vec::Vec`]
 //! type.
 //!
-//! These functions are designed to be usable with `#![no_std]` and
+//! These functions are designed to be usable with `#![no_std]`,
 //! `#[cfg(no_global_oom_handling)]`(see <https://github.com/rust-lang/rust/pull/84266>)
-//! enabled.
+//! enabled and Allocators (see <https://github.com/rust-lang/wg-allocators>).
 //!
 //! # Usage
 //!
 //! The recommended way to add these functions to `Vec` is by adding a `use`
-//! declaration for the entire module: `use fallible_vec::*`:
+//! declaration for the `FallibleVec` trait: `use fallible_vec::FallibleVec`:
 //! ```
 //! # #![feature(allocator_api)]
 //! # #[macro_use] extern crate fallible_vec;
-//! use fallible_vec::*;
+//! use fallible_vec::{FallibleVec, try_vec};
+//!
 //! let mut vec = try_vec![1, 2]?;
 //! vec.try_push(3)?;
 //! assert_eq!(vec, [1, 2, 3]);
