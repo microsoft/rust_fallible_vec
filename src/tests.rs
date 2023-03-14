@@ -142,7 +142,7 @@ fn test_collect_after_iterator_clone() {
     let v = try_vec_in![0; 5 => Global].unwrap();
     let mut i = v.into_iter().map(|i| i + 1).peekable();
     i.peek();
-    let v = try_collect_in(i.clone(), Global).unwrap();
+    let v = i.clone().try_collect().unwrap();
     assert_eq!(v, [1, 1, 1, 1, 1]);
     assert!(v.len() <= v.capacity());
 }

@@ -1,6 +1,13 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Invoke-CheckExitCode([scriptblock]$ScriptBlock) {
+    & $ScriptBlock
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+}
+
 function Invoke-WithEnvironment([System.Collections.IDictionary] $Environment, [scriptblock]$ScriptBlock) {
     try {
         # Set the environment.
@@ -29,18 +36,18 @@ Invoke-WithEnvironment `
         #
         # Run tests
         #
-        cargo test --locked
+        Invoke-CheckExitCode { cargo test --locked }
 
         #
         # Lint and check formatting.
         #
-        cargo clippy --locked -- -D warnings
-        cargo fmt --check
+        Invoke-CheckExitCode { cargo clippy --locked -- -D warnings }
+        Invoke-CheckExitCode { cargo fmt --check }
 
         #
         # Check docs
         #
-        cargo doc --locked
+        Invoke-CheckExitCode { cargo doc --locked }
 
         #
         # Verify that we can build with #[cfg(no_global_oom_handling)] enabled.
@@ -63,10 +70,12 @@ Invoke-WithEnvironment `
                 # in the standard library.
                 'env:RUSTFLAGS' = '--cfg no_global_oom_handling';
             } `
-            -ScriptBlock { cargo build --locked -Z build-std=core,alloc --target $target }
+            -ScriptBlock {
+                Invoke-CheckExitCode { cargo build --locked -Z build-std=core,alloc --target $target }
+            }
 }
 
 # Run tests under miri
-rustup toolchain install nightly --component miri
-cargo +nightly miri setup
-cargo +nightly miri test
+Invoke-CheckExitCode { rustup toolchain install nightly --component miri }
+Invoke-CheckExitCode { cargo +nightly miri setup }
+Invoke-CheckExitCode { cargo +nightly miri test }

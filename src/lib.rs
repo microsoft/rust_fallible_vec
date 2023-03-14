@@ -46,19 +46,21 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 extern crate alloc;
+mod collect;
 mod set_len_on_drop;
-
-use core::{
-    alloc::Allocator,
-    ops::{Range, RangeBounds},
-    slice,
-};
 
 use alloc::{
     collections::{TryReserveError, TryReserveErrorKind},
     vec::Vec,
 };
+use core::{
+    alloc::Allocator,
+    ops::{Range, RangeBounds},
+    slice,
+};
 use set_len_on_drop::SetLenOnDrop;
+
+pub use collect::TryCollect;
 
 // These are defined so that the try_vec! and try_vec_in! macros can refer to
 // these types in a consistent way: even if the consuming crate doesn't use
@@ -68,7 +70,7 @@ pub mod alloc_usings {
     pub use alloc::{alloc::Layout, boxed::Box, collections::TryReserveError, vec::Vec};
 }
 
-/// Methods available for all `Vec` instantiations.
+/// Fallible allocation methods for [`Vec`].
 pub trait FallibleVec<T, A: Allocator>: Sized {
     /// Extends the `Vec` using the items from the given iterator.
     ///
@@ -430,7 +432,7 @@ impl<T, A: Allocator> FallibleVec<T, A> for Vec<T, A> {
         }
 
         // Gather up the remainder and copy those as well.
-        let remainder = try_collect_in(replace_with, alloc)?;
+        let remainder = replace_with.try_collect_in(alloc)?;
         if !remainder.is_empty() {
             move_tail(self, index, remainder.len())?;
             // Don't need to use `SetLenOnDrop` here since we're enumerating
@@ -667,24 +669,6 @@ pub fn try_with_capacity_in<T, A: Allocator>(
 pub fn try_with_capacity<T>(size: usize) -> Result<Vec<T>, TryReserveError> {
     let mut vec: Vec<T> = Vec::new();
     vec.try_reserve(size)?;
-    Ok(vec)
-}
-
-/// Attempts to collect items from an iterator into a vector with the provided
-/// allocator.
-pub fn try_collect_in<T, A: Allocator>(
-    iter: impl Iterator<Item = T>,
-    alloc: A,
-) -> Result<Vec<T, A>, TryReserveError> {
-    let mut vec = Vec::new_in(alloc);
-    vec.try_extend(iter)?;
-    Ok(vec)
-}
-
-/// Attempts to collect items from an iterator into a vector.
-pub fn try_collect<T>(iter: impl Iterator<Item = T>) -> Result<Vec<T>, TryReserveError> {
-    let mut vec = Vec::new();
-    vec.try_extend(iter)?;
     Ok(vec)
 }
 
