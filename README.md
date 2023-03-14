@@ -2,13 +2,16 @@
 
 Fallible allocation functions for the Rust standard library's [`alloc::vec::Vec`](https://doc.rust-lang.org/std/vec/struct.Vec.html) type.
 
-These functions are designed to be usable with `#![no_std]` and `#[cfg(no_global_oom_handling)]`(see <https://github.com/rust-lang/rust/pull/84266>) enabled.
+These functions are designed to be usable with `#![no_std]`, `#[cfg(no_global_oom_handling)]` (see
+<https://github.com/rust-lang/rust/pull/84266>) enabled and Allocators (see <https://github.com/rust-lang/wg-allocators>).
 
 ## Usage
 
-The recommended way to add these functions to `Vec` is by adding a `use` declaration for the entire module: `use fallible_vec::*`:
+The recommended way to add these functions to `Vec` is by adding a `use` declaration for the
+`FallibleVec` trait: `use fallible_vec::FallibleVec`:
 ```rust
-use fallible_vec::*;
+use fallible_vec::{FallibleVec, try_vec};
+
 let mut vec = try_vec![1, 2]?;
 vec.try_push(3)?;
 assert_eq!(vec, [1, 2, 3]);
@@ -16,24 +19,72 @@ assert_eq!(vec, [1, 2, 3]);
 
 ## Panic Safety
 
-These methods are "panic safe", meaning that if a call to external code (e.g., an iterator's `next()` method or an implementation of `Clone::clone()`) panics, then these methods will leave the `Vec` in a consistent state:
+These methods are "panic safe", meaning that if a call to external code (e.g., an iterator's
+`next()` method or an implementation of `Clone::clone()`) panics, then these methods will leave the
+`Vec` in a consistent state:
 * `len()` will be less than or equal to `capacity()`.
-* Items in `0..len()` will only be items originally in the `Vec` or items being added to the `Vec`. It will never include uninitialized memory, duplicated items or dropped items.
-* Items originally (but no longer) in the `Vec` or being added to (but not yet in) the `Vec` may be leaked - any method that may leak items like this will have a note to specify its behavior.
+* Items in `0..len()` will only be items originally in the `Vec` or items being added to the `Vec`.
+  It will never include uninitialized memory, duplicated items or dropped items.
+* Items originally (but no longer) in the `Vec` or being added to (but not yet in) the `Vec` may be
+  leaked - any method that may leak items like this will have a note to specify its behavior.
 
 The exact behavior of each method is specified in its documentation.
 
 ## Code origin
 
-Most of this code is forked from [Rust's Standard Library](https://github.com/rust-lang/rust). While we will attempt to keep the code and docs in sync, if you notice any issues please check if they have been fixed in the Standard Library first.
+Most of this code is forked from [Rust's Standard Library](https://github.com/rust-lang/rust). While
+we will attempt to keep the code and docs in sync, if you notice any issues please check if they
+have been fixed in the Standard Library first.
 
 ## This API is incomplete
 
-There are many more infallible functions on `Vec` which have not been ported yet. If there's a particular API that you're missing feel free to open a PR or file an Issue to get it added.
+There are many more infallible functions on `Vec` which have not been ported yet. If there's a
+particular API that you're missing feel free to open a PR or file an Issue to get it added.
 
-## Why are these not already in the Standard Library
+## Why are these not already in the Standard Library?
 
-There is a [PR to add these and more](https://github.com/rust-lang/rust/pull/95051) to the Standard Library, followed by an [RFC to discuss if it's a good idea or not to do so](https://github.com/rust-lang/rfcs/pull/3271).
+There is a [PR to add these and more](https://github.com/rust-lang/rust/pull/95051) to the Standard
+Library, followed by an [RFC to discuss if it's a good idea or not to do so](https://github.com/rust-lang/rfcs/pull/3271).
+
+## Why would I use this crate versus similar crates?
+
+In general, `fallible_vec` is only useful in situations where `#[cfg(no_global_oom_handling)]` is
+required, or if using the Allocator API (functions ending in `_in`). Other crates use APIs that
+don't exist when `#[cfg(no_global_oom_handling)]` is enabled (like `vec::push`), whereas
+`fallible_vec` reimplements each function to avoid these APIs and builds with `#[cfg(no_global_oom_handling)]`
+in its CI.
+
+`fallible_vec` focuses on `vec` alone, whereas other crates provide support for additional types
+(like `Box` and `HashMap`).
+
+Comparing `fallible_vec` to [`fallible_collections`](https://crates.io/crates/fallible_collections):
+
+|                                           | `fallible_vec` v0.1.0 | `fallible_collections` v0.4.7 |
+|-------------------------------------------|:---------------------:|:-----------------------------:|
+| Supports `no_std`                         | X                     | X                             |
+| Supports `#[cfg(no_global_oom_handling)]` | X                     |                               |
+| Requires nightly                          | X                     |                               |
+| `vec::try_append`                         |                       | X                             |
+| `vec::try_extend`                         | X                     |                               |
+| `vec::try_extend_from_slice`              | X                     | X                             |
+| `vec::try_insert`                         | X                     | X                             |
+| `vec::try_push`                           | X                     | X                             |
+| `vec::try_push_give_back`                 |                       | X                             |
+| `vec::try_resize`                         | X                     | X                             |
+| `vec::try_resize_with`                    | X                     | X                             |
+| `vec::try_splice_in`                      | X                     |                               |
+| `try_collect`                             | X                     | X                             |
+| `try_collect_in`                          | X                     |                               |
+| `try_from_iterator`                       |                       | X                             |
+| `try_with_capacity`                       | X                     |                               |
+| `try_with_capacity_in`                    | X                     |                               |
+| `try_vec!`                                | X                     |                               |
+| `try_vec_in!`                             | X                     |                               |
+| `Box::*`                                  |                       | X                             |
+| `Arc::*`                                  |                       | X                             |
+| `Rc::*`                                   |                       | X                             |
+| `HashMap::*`                              |                       | X                             |
+| `try_format!`                             |                       | X                             |
 
 ## Contributing
 
