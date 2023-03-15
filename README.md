@@ -5,6 +5,9 @@ Fallible allocation functions for the Rust standard library's [`alloc::vec::Vec`
 These functions are designed to be usable with `#![no_std]`, `#[cfg(no_global_oom_handling)]` (see
 <https://github.com/rust-lang/rust/pull/84266>) enabled and Allocators (see <https://github.com/rust-lang/wg-allocators>).
 
+By default this crate requires the nightly compiler, but the stable compiler can be used if all
+features are disabled (i.e., specifying [`default-features = false` for the dependency](https://doc.rust-lang.org/cargo/reference/features.html#the-default-feature)).
+
 ## Usage
 
 The recommended way to add these functions to `Vec` is by adding a `use` declaration for the
@@ -63,7 +66,8 @@ Comparing `fallible_vec` to [`fallible_collections`](https://crates.io/crates/fa
 |-------------------------------------------|:---------------------:|:-----------------------------:|
 | Supports `no_std`                         | X                     | X                             |
 | Supports `#[cfg(no_global_oom_handling)]` | X                     |                               |
-| Requires nightly                          | X                     |                               |
+| Requires nightly rust compiler by default | X                     |                               |
+| Supports stable rust compiler             | X                     | X                             |
 | `vec::try_append`                         |                       | X                             |
 | `vec::try_extend`                         | X                     |                               |
 | `vec::try_extend_from_slice`              | X                     | X                             |
@@ -85,6 +89,17 @@ Comparing `fallible_vec` to [`fallible_collections`](https://crates.io/crates/fa
 | `Rc::*`                                   |                       | X                             |
 | `HashMap::*`                              |                       | X                             |
 | `try_format!`                             |                       | X                             |
+
+## Building locally
+
+The recommended way to build locally is to use the `build.ps1` script: this will build the crate
+using all feature combinations, run tests, check formatting, run clippy and build with `#[cfg(no_global_oom_handling)]`
+enabled.
+
+In order to run this script you'll need:
+* [PowerShell 7+](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell)
+* [Rust](https://rustup.rs/)
+  * Including the [`rust-src` component](https://rust-lang.github.io/rustup/concepts/components.html).
 
 ## Contributing
 
