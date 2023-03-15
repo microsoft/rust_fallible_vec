@@ -1,10 +1,18 @@
 [package]
 name = "fallible_vec"
 description = "Fallible allocation functions for the Rust standard library's `Vec` type."
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license-file = "LICENSE"
 repository = "https://github.com/microsoft/rust_fallible_vec"
 readme = "README.md"
 categories = ["embedded", "memory-management", "no-std"]
 keywords = ["vec", "fallible", "collections", "no_std"]
+
+[dependencies]
+static_assertions = "1.1"
+
+[features]
+default = ["allocator_api", "use_unstable_apis"]
+allocator_api = []
+use_unstable_apis = []

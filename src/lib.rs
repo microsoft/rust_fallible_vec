@@ -5,6 +5,10 @@
 //! `#[cfg(no_global_oom_handling)]`(see <https://github.com/rust-lang/rust/pull/84266>)
 //! enabled and Allocators (see <https://github.com/rust-lang/wg-allocators>).
 //!
+//! By default this crate requires the nightly compiler, but the stable compiler
+//! can be used if all features are disabled (i.e., specifying
+//! [`default-features = false` for the dependency](https://doc.rust-lang.org/cargo/reference/features.html#the-default-feature)).
+//!
 //! # Usage
 //!
 //! The recommended way to add these functions to `Vec` is by adding a `use`
@@ -40,27 +44,24 @@
 //! `Vec` which have not been ported yet.
 
 #![cfg_attr(not(any(test, doc)), no_std)]
-#![feature(allocator_api)]
-#![feature(slice_range)]
-#![feature(try_reserve_kind)]
+#![cfg_attr(feature = "allocator_api", feature(allocator_api))]
+#![cfg_attr(feature = "use_unstable_apis", feature(slice_range, try_reserve_kind))]
 #![deny(unsafe_op_in_unsafe_fn)]
 
 extern crate alloc;
+
 mod collect;
+mod error;
 mod set_len_on_drop;
 
-use alloc::{
-    collections::{TryReserveError, TryReserveErrorKind},
-    vec::Vec,
-};
-use core::{
-    alloc::Allocator,
-    ops::{Range, RangeBounds},
-    slice,
-};
+use alloc::{collections::TryReserveError, vec::Vec};
 use set_len_on_drop::SetLenOnDrop;
 
+#[cfg(feature = "allocator_api")]
+use core::alloc::Allocator;
+
 pub use collect::TryCollect;
+pub use error::alloc_error;
 
 // These are defined so that the try_vec! and try_vec_in! macros can refer to
 // these types in a consistent way: even if the consuming crate doesn't use
@@ -71,7 +72,7 @@ pub mod alloc_usings {
 }
 
 /// Fallible allocation methods for [`Vec`].
-pub trait FallibleVec<T, A: Allocator>: Sized {
+pub trait FallibleVec<T>: Sized {
     /// Extends the `Vec` using the items from the given iterator.
     ///
     /// # Panic safety
@@ -197,9 +198,10 @@ pub trait FallibleVec<T, A: Allocator>: Sized {
     /// assert_eq!(&v, &[1, 7, 8, 9, 4]);
     /// # Ok::<(), std::collections::TryReserveError>(())
     /// ```
-    fn try_splice_in<I: IntoIterator<Item = T>>(
+    #[cfg(all(feature = "allocator_api", feature = "use_unstable_apis"))]
+    fn try_splice_in<I: IntoIterator<Item = T>, A: Allocator>(
         &mut self,
-        range: impl RangeBounds<usize>,
+        range: impl core::ops::RangeBounds<usize>,
         replace_with: I,
         alloc: A,
     ) -> Result<(), TryReserveError>;
@@ -274,189 +276,193 @@ pub trait FallibleVec<T, A: Allocator>: Sized {
         T: Clone;
 }
 
-impl<T, A: Allocator> FallibleVec<T, A> for Vec<T, A> {
-    fn try_extend<I: IntoIterator<Item = T>>(&mut self, iter: I) -> Result<(), TryReserveError> {
-        let iter = iter.into_iter();
-        let (low_bound, _upper_bound) = iter.size_hint();
-        self.try_reserve(low_bound)?;
-        for item in iter {
-            self.try_push(item)?;
-        }
-        Ok(())
-    }
+macro_rules! impl_trait_for_vec {
+    { impl $trait:ident $impl:tt } => {
+        #[cfg(not(feature = "allocator_api"))]
+        impl<T> $trait<T> for Vec<T> $impl
 
-    fn try_extend_from_slice(&mut self, slice: &[T]) -> Result<(), TryReserveError>
-    where
-        T: Clone,
-    {
-        self.try_reserve(slice.len())?;
-        let ptr = self.as_mut_ptr();
-        let mut local_len = SetLenOnDrop::new(self);
-        for item in slice.iter() {
-            unsafe {
-                ptr.add(local_len.current_len()).write(item.clone());
+        #[cfg(feature = "allocator_api")]
+        impl<T, A: Allocator> $trait<T> for Vec<T, A> $impl
+    }
+}
+
+impl_trait_for_vec! {
+    impl FallibleVec {
+        fn try_extend<I: IntoIterator<Item = T>>(&mut self, iter: I) -> Result<(), TryReserveError> {
+            let iter = iter.into_iter();
+            let (low_bound, _upper_bound) = iter.size_hint();
+            self.try_reserve(low_bound)?;
+            for item in iter {
+                self.try_push(item)?;
             }
-            local_len.increment_len(1);
+            Ok(())
         }
 
-        Ok(())
-    }
-
-    fn try_push(&mut self, item: T) -> Result<(), TryReserveError> {
-        self.try_reserve(1)?;
-        unsafe {
-            self.as_mut_ptr().add(self.len()).write(item);
-            self.set_len(self.len() + 1);
-        }
-        Ok(())
-    }
-
-    fn try_insert(&mut self, index: usize, element: T) -> Result<(), TryReserveError> {
-        move_tail(self, index, 1)?;
-        unsafe {
-            self.as_mut_ptr().add(index).write(element);
-            self.set_len(self.len() + 1);
-        }
-        Ok(())
-    }
-
-    fn try_resize(&mut self, new_len: usize, item: T) -> Result<(), TryReserveError>
-    where
-        T: Clone,
-    {
-        #[allow(clippy::comparison_chain)]
-        if new_len < self.len() {
-            self.truncate(new_len);
-        } else if new_len > self.len() {
-            self.try_reserve(new_len - self.len())?;
+        fn try_extend_from_slice(&mut self, slice: &[T]) -> Result<(), TryReserveError>
+        where
+            T: Clone,
+        {
+            self.try_reserve(slice.len())?;
             let ptr = self.as_mut_ptr();
             let mut local_len = SetLenOnDrop::new(self);
-            loop {
+            for item in slice.iter() {
                 unsafe {
                     ptr.add(local_len.current_len()).write(item.clone());
                 }
                 local_len.increment_len(1);
-                if local_len.current_len() == new_len {
-                    break;
-                }
             }
-        }
-        Ok(())
-    }
 
-    fn try_resize_with<F: FnMut() -> T>(
-        &mut self,
-        new_len: usize,
-        mut f: F,
-    ) -> Result<(), TryReserveError> {
-        #[allow(clippy::comparison_chain)]
-        if new_len < self.len() {
-            self.truncate(new_len);
-        } else if new_len > self.len() {
-            self.try_reserve(new_len - self.len())?;
-            let ptr = self.as_mut_ptr();
-            let mut local_len = SetLenOnDrop::new(self);
-            loop {
-                let item = f();
-                // Immediately set the length, to protect against panics that occur when calling 'f'.
-                unsafe {
-                    ptr.add(local_len.current_len()).write(item);
-                }
-                local_len.increment_len(1);
-                if local_len.current_len() == new_len {
-                    break;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn try_splice_in<I: IntoIterator<Item = T>>(
-        &mut self,
-        range: impl RangeBounds<usize>,
-        replace_with: I,
-        alloc: A,
-    ) -> Result<(), TryReserveError> {
-        let mut replace_with = replace_with.into_iter();
-        let Range {
-            start: mut index,
-            end,
-        } = slice::range(range, ..self.len());
-
-        // Write over the items that need to be removed first.
-        while index < end {
-            if let Some(item) = replace_with.next() {
-                self[index] = item;
-                index += 1;
-            } else {
-                // Nothing else to insert, drop the rest.
-                self.drain(index..end);
-                return Ok(());
-            }
+            Ok(())
         }
 
-        // If we know roughly how many more there are, copy those directly.
-        let (lower_bound, ..) = replace_with.size_hint();
-        if lower_bound > 0 {
-            move_tail(self, index, lower_bound)?;
-
-            // Temporarily reduce the length: this will result in both the
-            // uninitialized memory AND the post-splice items being leaked if a
-            // call to next() panics.
-            let after_splice = self.len() - index;
+        fn try_push(&mut self, item: T) -> Result<(), TryReserveError> {
+            self.try_reserve(1)?;
             unsafe {
-                self.set_len(index);
+                self.as_mut_ptr().add(self.len()).write(item);
+                self.set_len(self.len() + 1);
             }
+            Ok(())
+        }
 
-            {
+        fn try_insert(&mut self, index: usize, element: T) -> Result<(), TryReserveError> {
+            self.move_tail(index, 1)?;
+            unsafe {
+                self.as_mut_ptr().add(index).write(element);
+                self.set_len(self.len() + 1);
+            }
+            Ok(())
+        }
+
+        fn try_resize(&mut self, new_len: usize, item: T) -> Result<(), TryReserveError>
+        where
+            T: Clone,
+        {
+            #[allow(clippy::comparison_chain)]
+            if new_len < self.len() {
+                self.truncate(new_len);
+            } else if new_len > self.len() {
+                self.try_reserve(new_len - self.len())?;
                 let ptr = self.as_mut_ptr();
                 let mut local_len = SetLenOnDrop::new(self);
                 loop {
                     unsafe {
-                        ptr.add(local_len.current_len())
-                            .write(replace_with.next().unwrap());
+                        ptr.add(local_len.current_len()).write(item.clone());
                     }
                     local_len.increment_len(1);
-                    if local_len.current_len() == index + lower_bound {
+                    if local_len.current_len() == new_len {
                         break;
                     }
                 }
             }
-
-            // Update the index to insert at.
-            index += lower_bound;
-            // Fixup length to include the port-splice items.
-            unsafe {
-                self.set_len(self.len() + after_splice);
-            }
+            Ok(())
         }
 
-        // Gather up the remainder and copy those as well.
-        let remainder = replace_with.try_collect_in(alloc)?;
-        if !remainder.is_empty() {
-            move_tail(self, index, remainder.len())?;
-            // Don't need to use `SetLenOnDrop` here since we're enumerating
-            // over a Vec that we own.
-            unsafe {
-                self.set_len(self.len() + remainder.len());
+        fn try_resize_with<F: FnMut() -> T>(
+            &mut self,
+            new_len: usize,
+            mut f: F,
+        ) -> Result<(), TryReserveError> {
+            #[allow(clippy::comparison_chain)]
+            if new_len < self.len() {
+                self.truncate(new_len);
+            } else if new_len > self.len() {
+                self.try_reserve(new_len - self.len())?;
+                let ptr = self.as_mut_ptr();
+                let mut local_len = SetLenOnDrop::new(self);
+                loop {
+                    let item = f();
+                    // Immediately set the length, to protect against panics that occur when calling 'f'.
+                    unsafe {
+                        ptr.add(local_len.current_len()).write(item);
+                    }
+                    local_len.increment_len(1);
+                    if local_len.current_len() == new_len {
+                        break;
+                    }
+                }
             }
-            let ptr = unsafe { self.as_mut_ptr().add(index) };
-            for (i, item) in remainder.into_iter().enumerate() {
-                unsafe { ptr.add(i).write(item) };
-            }
+            Ok(())
         }
 
-        Ok(())
-    }
-}
+        #[cfg(all(feature = "allocator_api", feature = "use_unstable_apis"))]
+        fn try_splice_in<I: IntoIterator<Item = T>, ATemp: Allocator>(
+            &mut self,
+            range: impl core::ops::RangeBounds<usize>,
+            replace_with: I,
+            alloc: ATemp,
+        ) -> Result<(), TryReserveError> {
+            let mut replace_with = replace_with.into_iter();
+            let core::ops::Range {
+                start: mut index,
+                end,
+            } = core::slice::range(range, ..self.len());
 
-#[doc(hidden)]
-pub fn alloc_error(layout: alloc::alloc::Layout) -> TryReserveError {
-    TryReserveErrorKind::AllocError {
-        layout,
-        non_exhaustive: (),
+            // Write over the items that need to be removed first.
+            while index < end {
+                if let Some(item) = replace_with.next() {
+                    self[index] = item;
+                    index += 1;
+                } else {
+                    // Nothing else to insert, drop the rest.
+                    self.drain(index..end);
+                    return Ok(());
+                }
+            }
+
+            // If we know roughly how many more there are, copy those directly.
+            let (lower_bound, ..) = replace_with.size_hint();
+            if lower_bound > 0 {
+                self.move_tail(index, lower_bound)?;
+
+                // Temporarily reduce the length: this will result in both the
+                // uninitialized memory AND the post-splice items being leaked if a
+                // call to next() panics.
+                let after_splice = self.len() - index;
+                unsafe {
+                    self.set_len(index);
+                }
+
+                {
+                    let ptr = self.as_mut_ptr();
+                    let mut local_len = SetLenOnDrop::new(self);
+                    loop {
+                        unsafe {
+                            ptr.add(local_len.current_len())
+                                .write(replace_with.next().unwrap());
+                        }
+                        local_len.increment_len(1);
+                        if local_len.current_len() == index + lower_bound {
+                            break;
+                        }
+                    }
+                }
+
+                // Update the index to insert at.
+                index += lower_bound;
+                // Fixup length to include the port-splice items.
+                unsafe {
+                    self.set_len(self.len() + after_splice);
+                }
+            }
+
+            // Gather up the remainder and copy those as well.
+            let remainder = replace_with.try_collect_in(alloc)?;
+            if !remainder.is_empty() {
+                self.move_tail(index, remainder.len())?;
+                // Don't need to use `SetLenOnDrop` here since we're enumerating
+                // over a Vec that we own.
+                unsafe {
+                    self.set_len(self.len() + remainder.len());
+                }
+                let ptr = unsafe { self.as_mut_ptr().add(index) };
+                for (i, item) in remainder.into_iter().enumerate() {
+                    unsafe { ptr.add(i).write(item) };
+                }
+            }
+
+            Ok(())
+        }
     }
-    .into()
 }
 
 /// Creates a [`Vec`] containing the arguments.
@@ -566,6 +572,7 @@ macro_rules! try_vec {
 ///
 /// [`Vec`]: alloc::vec::Vec
 #[macro_export]
+#[cfg(feature = "allocator_api")]
 macro_rules! try_vec_in {
     ($allocator:expr) => (
         core::result::Result::Ok::<Vec<_, _>, $crate::alloc_usings::TryReserveError>(
@@ -621,6 +628,7 @@ macro_rules! try_vec_in {
 /// assert!(vec.capacity() >= 11);
 /// # Ok::<(), std::collections::TryReserveError>(())
 /// ```
+#[cfg(feature = "allocator_api")]
 pub fn try_with_capacity_in<T, A: Allocator>(
     size: usize,
     alloc: A,
@@ -673,58 +681,72 @@ pub fn try_with_capacity<T>(size: usize) -> Result<Vec<T>, TryReserveError> {
 }
 
 #[doc(hidden)]
+#[cfg(feature = "allocator_api")]
 pub fn try_new_repeat_item_in<T: Clone, A: Allocator>(
     item: T,
     size: usize,
     alloc: A,
 ) -> Result<Vec<T, A>, TryReserveError> {
-    try_new_repeat_item_internal(Vec::new_in(alloc), item, size)
+    Vec::new_in(alloc).try_new_repeat_item_internal(item, size)
 }
 
 #[doc(hidden)]
 pub fn try_new_repeat_item<T: Clone>(item: T, size: usize) -> Result<Vec<T>, TryReserveError> {
-    try_new_repeat_item_internal(Vec::new(), item, size)
+    Vec::new().try_new_repeat_item_internal(item, size)
 }
 
-#[inline]
-fn try_new_repeat_item_internal<T: Clone, A: Allocator>(
-    mut vec: Vec<T, A>,
-    item: T,
-    size: usize,
-) -> Result<Vec<T, A>, TryReserveError> {
-    if size > 0 {
-        vec.try_reserve(size)?;
-        let ptr = vec.as_mut_ptr();
-        let mut local_len = SetLenOnDrop::new(&mut vec);
-        loop {
+trait ImplementationDetails<T>: Sized {
+    fn try_new_repeat_item_internal(self, item: T, size: usize) -> Result<Self, TryReserveError>
+    where
+        T: Clone;
+
+    fn move_tail(&mut self, index: usize, by: usize) -> Result<(), TryReserveError>;
+}
+
+impl_trait_for_vec! {
+    impl ImplementationDetails {
+        #[inline]
+        fn try_new_repeat_item_internal(
+            mut self,
+            item: T,
+            size: usize,
+        ) -> Result<Self, TryReserveError>
+        where T: Clone {
+            if size > 0 {
+                self.try_reserve(size)?;
+                let ptr = self.as_mut_ptr();
+                let mut local_len = SetLenOnDrop::new(&mut self);
+                loop {
+                    unsafe {
+                        ptr.add(local_len.current_len()).write(item.clone());
+                    }
+                    local_len.increment_len(1);
+                    if local_len.current_len() == size {
+                        break;
+                    }
+                }
+            }
+            Ok(self)
+        }
+
+        /// Resizes the `vec` to fit additional elements by moving all of the elements
+        /// at and after `index` by `by` slots.
+        ///
+        /// NOTE: Does NOT change the `len` of the `vec`.
+        fn move_tail(
+            &mut self,
+            index: usize,
+            by: usize,
+        ) -> Result<(), TryReserveError> {
+            self.try_reserve(by)?;
+            let source = unsafe { self.as_ptr().add(index) };
+            let destination = unsafe { self.as_mut_ptr().add(index + by) };
             unsafe {
-                ptr.add(local_len.current_len()).write(item.clone());
+                core::ptr::copy(source, destination, self.len() - index);
             }
-            local_len.increment_len(1);
-            if local_len.current_len() == size {
-                break;
-            }
+            Ok(())
         }
     }
-    Ok(vec)
-}
-
-/// Resizes the `vec` to fit additional elements by moving all of the elements
-/// at and after `index` by `by` slots.
-///
-/// NOTE: Does NOT change the `len` of the `vec`.
-fn move_tail<T, A: Allocator>(
-    vec: &mut Vec<T, A>,
-    index: usize,
-    by: usize,
-) -> Result<(), TryReserveError> {
-    vec.try_reserve(by)?;
-    let source = unsafe { vec.as_ptr().add(index) };
-    let destination = unsafe { vec.as_mut_ptr().add(index + by) };
-    unsafe {
-        core::ptr::copy(source, destination, vec.len() - index);
-    }
-    Ok(())
 }
 
 #[cfg(test)]

@@ -1,5 +1,8 @@
 use crate::FallibleVec;
-use alloc::{collections::TryReserveError, vec::Vec};
+use crate::TryReserveError;
+use alloc::vec::Vec;
+
+#[cfg(feature = "allocator_api")]
 use core::alloc::Allocator;
 
 /// Fallible allocations equivalents for [`Iterator::collect`].
@@ -20,6 +23,7 @@ pub trait TryCollect<T> {
     /// assert_eq!(vec, [2, 4, 6, 8, 10]);
     /// # Ok::<(), std::collections::TryReserveError>(())
     /// ```
+    #[cfg(feature = "allocator_api")]
     fn try_collect_in<A: Allocator>(self, alloc: A) -> Result<Vec<T, A>, TryReserveError>;
 
     /// Attempts to collect items from an iterator into a vector.
@@ -43,6 +47,7 @@ impl<T, I> TryCollect<T> for I
 where
     I: IntoIterator<Item = T>,
 {
+    #[cfg(feature = "allocator_api")]
     fn try_collect_in<A: Allocator>(self, alloc: A) -> Result<Vec<T, A>, TryReserveError> {
         let mut vec = Vec::new_in(alloc);
         vec.try_extend(self.into_iter())?;
