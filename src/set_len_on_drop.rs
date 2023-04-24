@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 // Forked from the Rust Standard Library: library/alloc/src/vec/set_len_on_drop.rs
 
 use alloc::vec::Vec;

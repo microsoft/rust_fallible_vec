@@ -47,6 +47,23 @@ function Invoke-WithEnvironment([System.Collections.IDictionary] $Environment, [
     }
 }
 
+# Verify that all sources files have the copyright header.
+[string[]] $copyrightHeader = @("// Copyright (c) Microsoft Corporation.", "// Licensed under the MIT license.")
+[bool] $hadMissingCopyright = $false
+foreach ($file in (Get-ChildItem -Path (Join-Path $PSScriptRoot 'src') -Filter '*.rs' -Recurse)) {
+    $contents = Get-Content -Path $file -TotalCount $copyrightHeader.Length
+    if ($null -ne (Compare-Object -ReferenceObject $copyrightHeader -DifferenceObject $contents)) {
+        $hadMissingCopyright = $true
+        $fileName = $file.FullName
+        Write-Error "'$fileName' is missing the copyright header." -ErrorAction Continue
+    }
+}
+if ($hadMissingCopyright) {
+    $mergedCopyrightHeader = $copyrightHeader | Join-String -Separator "`n"
+    Write-Error "One or more files was missing the copyright header. To fix this, add the copyright header to any non-compliant files:`n$mergedCopyrightHeader"
+    exit 1
+}
+
 Invoke-WithEnvironment `
     -Environment @{
         # Enable unstable features on stable toolchain.

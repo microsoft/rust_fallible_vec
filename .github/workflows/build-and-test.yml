@@ -31,11 +31,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      # no_global_oom_handling is currently broken in 1.69: https://github.com/rust-lang/rust/pull/110649
+      # So use 1.68 until it gets fixed.
       - name: Update Rust toolchain
-        run: rustup update
+        run: rustup install 1.68
 
-      - name: Add the rust-src component
-        run: rustup component add rust-src --toolchain stable-${{ matrix.target }}
+      - name: Set 1.68 as the default
+        run: rustup default 1.68
+
+      - name: Add required components
+        run: rustup component add rust-src clippy rustfmt rust-docs --toolchain 1.68-${{ matrix.target }}
 
       - name: Run build script
         shell: pwsh

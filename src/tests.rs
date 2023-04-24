@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 use crate::*;
 use alloc::{alloc::Global, vec::Vec};
 use core::sync::atomic::{AtomicI32, Ordering};

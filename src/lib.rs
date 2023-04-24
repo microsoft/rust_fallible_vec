@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! Fallible allocation functions for the Rust standard library's [`alloc::vec::Vec`]
 //! type.
 //!
