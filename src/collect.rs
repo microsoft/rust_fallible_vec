@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 use crate::FallibleVec;
 use crate::TryReserveError;
 use alloc::vec::Vec;

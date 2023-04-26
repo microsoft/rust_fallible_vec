@@ -62,7 +62,7 @@ in its CI.
 
 Comparing `fallible_vec` to [`fallible_collections`](https://crates.io/crates/fallible_collections):
 
-|                                           | `fallible_vec` v0.1.0 | `fallible_collections` v0.4.7 |
+|                                           | `fallible_vec` v0.3.1 | `fallible_collections` v0.4.7 |
 |-------------------------------------------|:---------------------:|:-----------------------------:|
 | Supports `no_std`                         | X                     | X                             |
 | Supports `#[cfg(no_global_oom_handling)]` | X                     |                               |
