@@ -46,8 +46,11 @@ particular API that you're missing feel free to open a PR or file an Issue to ge
 
 ## Why are these not already in the Standard Library?
 
-There is a [PR to add these and more](https://github.com/rust-lang/rust/pull/95051) to the Standard
+There was a [PR to add these and more](https://github.com/rust-lang/rust/pull/95051) to the Standard
 Library, followed by an [RFC to discuss if it's a good idea or not to do so](https://github.com/rust-lang/rfcs/pull/3271).
+These were closed with the hopes of reopening them once [Keyword Generics](https://blog.rust-lang.org/inside-rust/2022/07/27/keyword-generics.html)
+are made available and so "fallible" variants of the existing functions can be added without
+exploding the API surface of `Vec`.
 
 ## Why would I use this crate versus similar crates?
 
