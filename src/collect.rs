@@ -53,13 +53,13 @@ where
     #[cfg(feature = "allocator_api")]
     fn try_collect_in<A: Allocator>(self, alloc: A) -> Result<Vec<T, A>, TryReserveError> {
         let mut vec = Vec::new_in(alloc);
-        vec.try_extend(self.into_iter())?;
+        vec.try_extend(self)?;
         Ok(vec)
     }
 
     fn try_collect(self) -> Result<Vec<T>, TryReserveError> {
         let mut vec = Vec::new();
-        vec.try_extend(self.into_iter())?;
+        vec.try_extend(self)?;
         Ok(vec)
     }
 }

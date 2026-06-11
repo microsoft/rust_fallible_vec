@@ -8,19 +8,29 @@ Builds the `fallible_vec` crate, runs tests, checks formatting, runs clippy.
 Adds `--locked` to the build commands to prevent the `Cargo.lock` file from being updated. This is
 useful for CI builds.
 
+.PARAMETER Target
+The target triple to build and test for (e.g. `aarch64-pc-windows-msvc`). When omitted, the host
+target is used. The required `rust-std` for the target must already be installed (e.g. via
+`rustup target add <target>`). Tests are only executed when the target can run on the host.
+
 .NOTES
 See README.md for details on the environment that this script expects.
 #>
 param (
     [Parameter(Mandatory = $false)]
     [switch]
-    $BuildLocked
+    $BuildLocked,
+
+    [Parameter(Mandatory = $false)]
+    [string]
+    $Target
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $lockedArg = $BuildLocked ? '--locked' : $null
+$targetArg = $Target ? @('--target', $Target) : @()
 
 function Invoke-CheckExitCode([string] $Description, [scriptblock]$ScriptBlock) {
     Write-Host "==== $Description ===="
@@ -77,40 +87,42 @@ Invoke-WithEnvironment `
         #
         # Check that enabling various feature combinations works.
         #
-        Invoke-CheckExitCode 'Build default' { cargo build $lockedArg }
-        Invoke-CheckExitCode 'Build allocator_api only' { cargo build $lockedArg --no-default-features --features allocator_api }
-        Invoke-CheckExitCode 'Build use_unstable_apis only' { cargo build $lockedArg --no-default-features --features use_unstable_apis }
+        Invoke-CheckExitCode 'Build default' { cargo build $lockedArg $targetArg }
+        Invoke-CheckExitCode 'Build allocator_api only' { cargo build $lockedArg $targetArg --no-default-features --features allocator_api }
+        Invoke-CheckExitCode 'Build use_unstable_apis only' { cargo build $lockedArg $targetArg --no-default-features --features use_unstable_apis }
 
         #
         # Run tests
         #
-        Invoke-CheckExitCode 'Test' { cargo test --locked }
+        Invoke-CheckExitCode 'Test' { cargo test --locked $targetArg }
 
         #
         # Lint and check formatting.
         #
-        Invoke-CheckExitCode 'Clippy' { cargo clippy --locked -- -D warnings }
+        Invoke-CheckExitCode 'Clippy' { cargo clippy --locked $targetArg -- -D warnings }
         Invoke-CheckExitCode 'Check format' { cargo fmt --check }
 
         #
         # Check docs
         #
-        Invoke-CheckExitCode 'Check docs' { cargo doc --locked }
+        Invoke-CheckExitCode 'Check docs' { cargo doc --locked $targetArg }
 
         #
         # Verify that we can build with #[cfg(no_global_oom_handling)] enabled.
         #
 
         # Find target (required for `build-std`).
-        [string] $target = ''
-        if ($Global:IsWindows) {
-            $target = 'x86_64-pc-windows-msvc'
-        } elseif ($Global:IsLinux) {
-            $target = 'x86_64-unknown-linux-gnu'
-        } elseif ($Global:IsMacOS) {
-            $target = 'x86_64-apple-darwin'
-        } else {
-            throw 'Unknown OS - Only Windows, Linux and MacOS are supported'
+        [string] $target = $Target
+        if (-not $target) {
+            if ($Global:IsWindows) {
+                $target = 'x86_64-pc-windows-msvc'
+            } elseif ($Global:IsLinux) {
+                $target = 'x86_64-unknown-linux-gnu'
+            } elseif ($Global:IsMacOS) {
+                $target = 'x86_64-apple-darwin'
+            } else {
+                throw 'Unknown OS - Only Windows, Linux and MacOS are supported'
+            }
         }
         Invoke-WithEnvironment `
             -Environment @{
@@ -124,7 +136,7 @@ Invoke-WithEnvironment `
 }
 
 # Build with no features enabled (should work on the non-nightly compiler).
-Invoke-CheckExitCode 'Build no features' { cargo build $lockedArg --no-default-features }
+Invoke-CheckExitCode 'Build no features' { cargo build $lockedArg $targetArg --no-default-features }
 
 # Run tests under miri
 Invoke-CheckExitCode 'Install miri' { rustup toolchain install nightly --component miri }
