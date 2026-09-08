@@ -29,7 +29,7 @@ jobs:
       CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
 
       # no_global_oom_handling is currently broken in 1.69: https://github.com/rust-lang/rust/pull/110649
       # So use 1.68 until it gets fixed.
