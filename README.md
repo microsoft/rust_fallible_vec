@@ -104,6 +104,13 @@ In order to run this script you'll need:
 * [Rust](https://rustup.rs/)
   * Including the [`rust-src` component](https://rust-lang.github.io/rustup/concepts/components.html).
 
+The Cargo feature `allocator_api` supports both Rust 1.99 and current nightly compilers.
+It selects Rust's `allocator_api` feature before Rust 1.100 and `allocator_ext` from Rust 1.100
+onward. On newer compilers, custom allocators passed to allocator-aware APIs must also implement
+[`AllocatorNightly`](https://doc.rust-lang.org/nightly/core/alloc/trait.AllocatorNightly.html),
+as required by the standard library's allocator-aware vector operations. `Global` and `System`
+already implement this trait.
+
 ## Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a

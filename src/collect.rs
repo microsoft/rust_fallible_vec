@@ -6,7 +6,7 @@ use crate::TryReserveError;
 use alloc::vec::Vec;
 
 #[cfg(feature = "allocator_api")]
-use core::alloc::Allocator;
+use crate::Allocator;
 
 /// Fallible allocations equivalents for [`Iterator::collect`].
 pub trait TryCollect<T> {
@@ -16,7 +16,9 @@ pub trait TryCollect<T> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(allocator_api)]
+    /// # #![feature(cfg_version)]
+    /// # #![cfg_attr(version("1.100"), feature(allocator_ext))]
+    /// # #![cfg_attr(not(version("1.100")), feature(allocator_api))]
     /// # #[macro_use] extern crate fallible_vec;
     /// use fallible_vec::*;
     /// use std::alloc::System;
@@ -34,7 +36,9 @@ pub trait TryCollect<T> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(allocator_api)]
+    /// # #![feature(cfg_version)]
+    /// # #![cfg_attr(version("1.100"), feature(allocator_ext))]
+    /// # #![cfg_attr(not(version("1.100")), feature(allocator_api))]
     /// # #[macro_use] extern crate fallible_vec;
     /// use fallible_vec::*;
     ///
@@ -53,13 +57,13 @@ where
     #[cfg(feature = "allocator_api")]
     fn try_collect_in<A: Allocator>(self, alloc: A) -> Result<Vec<T, A>, TryReserveError> {
         let mut vec = Vec::new_in(alloc);
-        vec.try_extend(self.into_iter())?;
+        vec.try_extend(self)?;
         Ok(vec)
     }
 
     fn try_collect(self) -> Result<Vec<T>, TryReserveError> {
         let mut vec = Vec::new();
-        vec.try_extend(self.into_iter())?;
+        vec.try_extend(self)?;
         Ok(vec)
     }
 }

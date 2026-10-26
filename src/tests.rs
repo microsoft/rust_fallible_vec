@@ -89,6 +89,13 @@ fn test_splice() {
 }
 
 #[test]
+fn test_collect_and_splice_with_system_allocator() {
+    let mut v = [1, 2, 3, 4, 5].try_collect_in(System).unwrap();
+    v.try_splice_in(1..4, [6], System).unwrap();
+    assert_eq!(v, &[1, 6, 5]);
+}
+
+#[test]
 fn test_splice_inclusive_range() {
     let mut v = try_vec![1, 2, 3, 4, 5].unwrap();
     let a = [10, 11, 12];

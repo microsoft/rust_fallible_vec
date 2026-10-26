@@ -128,5 +128,5 @@ Invoke-CheckExitCode 'Build no features' { cargo build $lockedArg --no-default-f
 
 # Run tests under miri
 Invoke-CheckExitCode 'Install miri' { rustup toolchain install nightly --component miri }
-Invoke-CheckExitCode 'Setup miti' { cargo +nightly miri setup }
+Invoke-CheckExitCode 'Setup miri' { cargo +nightly miri setup }
 Invoke-CheckExitCode 'Miri test' { cargo +nightly miri test }
