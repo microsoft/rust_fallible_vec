@@ -17,7 +17,9 @@
 //! The recommended way to add these functions to `Vec` is by adding a `use`
 //! declaration for the `FallibleVec` trait: `use fallible_vec::FallibleVec`:
 //! ```
-//! # #![feature(allocator_api)]
+//! # #![feature(cfg_version)]
+//! # #![cfg_attr(version("1.100"), feature(allocator_ext))]
+//! # #![cfg_attr(not(version("1.100")), feature(allocator_api))]
 //! # #[macro_use] extern crate fallible_vec;
 //! use fallible_vec::{FallibleVec, try_vec};
 //!
@@ -47,8 +49,17 @@
 //! `Vec` which have not been ported yet.
 
 #![cfg_attr(not(any(test, doc)), no_std)]
-#![cfg_attr(feature = "allocator_api", feature(allocator_api))]
-#![cfg_attr(feature = "use_unstable_apis", feature(slice_range, try_reserve_kind))]
+#![cfg_attr(feature = "allocator_api", feature(cfg_version))]
+#![cfg_attr(
+    feature = "allocator_api",
+    cfg_attr(version("1.100"), feature(allocator_ext)),
+    cfg_attr(not(version("1.100")), feature(allocator_api))
+)]
+#![cfg_attr(feature = "use_unstable_apis", feature(try_reserve_kind))]
+#![cfg_attr(
+    all(feature = "allocator_api", feature = "use_unstable_apis"),
+    feature(slice_range)
+)]
 #![deny(unsafe_op_in_unsafe_fn)]
 
 extern crate alloc;
@@ -61,7 +72,15 @@ use alloc::{collections::TryReserveError, vec::Vec};
 use set_len_on_drop::SetLenOnDrop;
 
 #[cfg(feature = "allocator_api")]
-use core::alloc::Allocator;
+mod allocator_compat {
+    #[cfg(not(version("1.100")))]
+    pub use core::alloc::Allocator;
+    #[cfg(version("1.100"))]
+    pub use core::alloc::AllocatorNightly as Allocator;
+}
+
+#[cfg(feature = "allocator_api")]
+use allocator_compat::Allocator;
 
 pub use collect::TryCollect;
 pub use error::alloc_error;
@@ -86,7 +105,9 @@ pub trait FallibleVec<T>: Sized {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(allocator_api)]
+    /// # #![feature(cfg_version)]
+    /// # #![cfg_attr(version("1.100"), feature(allocator_ext))]
+    /// # #![cfg_attr(not(version("1.100")), feature(allocator_api))]
     /// # #[macro_use] extern crate fallible_vec;
     /// use fallible_vec::*;
     ///
@@ -102,7 +123,9 @@ pub trait FallibleVec<T>: Sized {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(allocator_api)]
+    /// # #![feature(cfg_version)]
+    /// # #![cfg_attr(version("1.100"), feature(allocator_ext))]
+    /// # #![cfg_attr(not(version("1.100")), feature(allocator_api))]
     /// # #[macro_use] extern crate fallible_vec;
     /// use fallible_vec::*;
     /// let mut vec = try_vec![1, 2]?;
@@ -122,7 +145,9 @@ pub trait FallibleVec<T>: Sized {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(allocator_api)]
+    /// # #![feature(cfg_version)]
+    /// # #![cfg_attr(version("1.100"), feature(allocator_ext))]
+    /// # #![cfg_attr(not(version("1.100")), feature(allocator_api))]
     /// # #[macro_use] extern crate fallible_vec;
     /// use fallible_vec::*;
     ///
@@ -152,7 +177,9 @@ pub trait FallibleVec<T>: Sized {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(allocator_api)]
+    /// # #![feature(cfg_version)]
+    /// # #![cfg_attr(version("1.100"), feature(allocator_ext))]
+    /// # #![cfg_attr(not(version("1.100")), feature(allocator_api))]
     /// # #[macro_use] extern crate fallible_vec;
     /// use fallible_vec::*;
     ///
@@ -190,7 +217,9 @@ pub trait FallibleVec<T>: Sized {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(allocator_api)]
+    /// # #![feature(cfg_version)]
+    /// # #![cfg_attr(version("1.100"), feature(allocator_ext))]
+    /// # #![cfg_attr(not(version("1.100")), feature(allocator_api))]
     /// # #[macro_use] extern crate fallible_vec;
     /// use fallible_vec::*;
     /// use std::alloc::System;
@@ -227,7 +256,9 @@ pub trait FallibleVec<T>: Sized {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(allocator_api)]
+    /// # #![feature(cfg_version)]
+    /// # #![cfg_attr(version("1.100"), feature(allocator_ext))]
+    /// # #![cfg_attr(not(version("1.100")), feature(allocator_api))]
     /// # #[macro_use] extern crate alloc;
     /// use fallible_vec::*;
     ///
@@ -261,7 +292,9 @@ pub trait FallibleVec<T>: Sized {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(allocator_api)]
+    /// # #![feature(cfg_version)]
+    /// # #![cfg_attr(version("1.100"), feature(allocator_ext))]
+    /// # #![cfg_attr(not(version("1.100")), feature(allocator_api))]
     /// # #[macro_use] extern crate alloc;
     /// use fallible_vec::*;
     ///
@@ -476,7 +509,9 @@ impl_trait_for_vec! {
 /// - Create a [`Vec`] containing a given list of elements:
 ///
 /// ```
-/// #![feature(allocator_api)]
+/// # #![feature(cfg_version)]
+/// # #![cfg_attr(version("1.100"), feature(allocator_ext))]
+/// # #![cfg_attr(not(version("1.100")), feature(allocator_api))]
 /// # #[macro_use] extern crate fallible_vec;
 /// let v = try_vec![1, 2, 3]?;
 /// assert_eq!(v[0], 1);
@@ -488,7 +523,9 @@ impl_trait_for_vec! {
 /// - Create a [`Vec`] from a given element and size:
 ///
 /// ```
-/// #![feature(allocator_api)]
+/// # #![feature(cfg_version)]
+/// # #![cfg_attr(version("1.100"), feature(allocator_ext))]
+/// # #![cfg_attr(not(version("1.100")), feature(allocator_api))]
 /// # #[macro_use] extern crate fallible_vec;
 /// let v = try_vec![1; 3]?;
 /// assert_eq!(v, [1, 1, 1]);
@@ -536,7 +573,9 @@ macro_rules! try_vec {
 /// - Create a [`Vec`] containing a given list of elements:
 ///
 /// ```
-/// #![feature(allocator_api)]
+/// # #![feature(cfg_version)]
+/// # #![cfg_attr(version("1.100"), feature(allocator_ext))]
+/// # #![cfg_attr(not(version("1.100")), feature(allocator_api))]
 /// # #[macro_use] extern crate fallible_vec;
 /// use std::alloc::System;
 ///
@@ -550,7 +589,9 @@ macro_rules! try_vec {
 /// - Create a [`Vec`] from a given element and size:
 ///
 /// ```
-/// #![feature(allocator_api)]
+/// # #![feature(cfg_version)]
+/// # #![cfg_attr(version("1.100"), feature(allocator_ext))]
+/// # #![cfg_attr(not(version("1.100")), feature(allocator_api))]
 /// # #[macro_use] extern crate fallible_vec;
 /// use std::alloc::System;
 ///
@@ -609,6 +650,9 @@ macro_rules! try_vec_in {
 /// # Examples
 ///
 /// ```
+/// # #![feature(cfg_version)]
+/// # #![cfg_attr(version("1.100"), feature(allocator_ext))]
+/// # #![cfg_attr(not(version("1.100")), feature(allocator_api))]
 /// # use fallible_vec::*;
 /// use std::alloc::System;
 ///
