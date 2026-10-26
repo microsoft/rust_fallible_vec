@@ -6,7 +6,7 @@ permissions:
 
 jobs:
   dependency-review:
-    runs-on: self-hosted
+    runs-on: x86_64-unknown-linux-gnu
     steps:
       - name: 'Checkout Repository'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
